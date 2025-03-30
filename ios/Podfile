@@ -12,7 +12,6 @@ project 'Runner', {
 target 'Runner' do
   use_frameworks!
 
-  flutter_ios_podfile_setup File.dirname(File.realpath(__FILE__))
 end
 
 def flutter_root
