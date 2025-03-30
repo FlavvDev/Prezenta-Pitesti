@@ -1,8 +1,6 @@
-# Podfile
 platform :ios, '13.0'
 workspace 'Runner.xcworkspace'
 
-# Disable CocoaPods stats (optional)
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
@@ -14,7 +12,7 @@ project 'Runner', {
 def flutter_root
   generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
   unless File.exist?(generated_xcode_build_settings_path)
-    abort("Unable to locate flutter sdk. Run 'flutter precache' or set FLUTTER_ROOT")
+    abort("Unable to locate Flutter SDK. Run 'flutter precache' or set FLUTTER_ROOT")
   end
   File.foreach(generated_xcode_build_settings_path) do |line|
     matches = line.match(/FLUTTER_ROOT\=(.*)/)
@@ -24,5 +22,4 @@ def flutter_root
 end
 
 require File.expand_path(File.join(flutter_root, 'packages', 'flutter_tools', 'bin', 'podhelper'), __FILE__)
-
 flutter_ios_podfile_setup
