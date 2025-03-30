@@ -1,5 +1,6 @@
 # Podfile
 platform :ios, '13.0'
+workspace 'Runner.xcworkspace'
 
 # Disable CocoaPods stats (optional)
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
