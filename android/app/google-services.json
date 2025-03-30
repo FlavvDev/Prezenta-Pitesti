@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "551860221613",
+    "project_id": "prezenta-filia",
+    "storage_bucket": "prezenta-filia.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:551860221613:android:1c8b8a4e7d9f15bfa77824",
+        "android_client_info": {
+          "package_name": "com.example.prezenta_dansuri"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBuBrk1fdKrlG7O0cFUAuV5e0H31_8hHQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
