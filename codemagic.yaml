@@ -10,6 +10,8 @@ workflows:
       # Dacă dorești să folosești variabile pentru semnare, le poți adăuga aici.
       # Exemplu:
       # APP_NAME: "Numele Aplicației"
+      groups:
+        - firebase_credentials
     scripts:
       - name: Install dependencies
         script: flutter pub get
