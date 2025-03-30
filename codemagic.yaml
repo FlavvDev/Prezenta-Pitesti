@@ -1,0 +1,20 @@
+workflows:
+  ios-workflow:
+    name: Prezenta Dansuri
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      vars:
+        APP_NAME: "Prezenta Dansuri"
+      # Dacă dorești să folosești variabile pentru semnare, le poți adăuga aici.
+      # Exemplu:
+      # APP_NAME: "Numele Aplicației"
+    scripts:
+      - name: Install dependencies
+        script: flutter pub get
+      - name: Build iOS IPA (no codesign)
+        # Dacă nu folosești semnare, folosește --no-codesign. Dacă vrei să semnezi, elimină această opțiune și configurează semnarea.
+        script: flutter build ipa --release --no-codesign
+    artifacts:
+      - build/ios/ipa/*.ipa
