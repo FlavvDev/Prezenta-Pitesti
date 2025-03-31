@@ -11,8 +11,10 @@ class FirebaseService {
 
   // Adaugă un membru (verificare case-insensitive, dacă dorești poți modifica și aici)
   Future<void> addMember(String name, [String birthDate = ""]) async {
-    QuerySnapshot querySnapshot = await members.where('name', isEqualTo: name).get();
-    if (querySnapshot.docs.isNotEmpty) {
+    QuerySnapshot querySnapshot = await members.get();
+    bool exists = querySnapshot.docs.any((doc) =>
+    (doc['name'] as String).toLowerCase() == name.toLowerCase());
+    if (exists) {
       throw Exception('Numele există deja.');
     }
     await members.add({'name': name, 'birthDate': birthDate});

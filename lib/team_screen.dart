@@ -127,7 +127,10 @@ class _TeamScreenState extends State<TeamScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text("Nume: $memberName"),
-              Text("Data nașterii: ${birthDate.isNotEmpty ? birthDate : "Nespecificată"}"),
+              Text(
+                  "Data nașterii: ${birthDate.isNotEmpty ? DateFormat("d MMMM yyyy", "ro_RO").format(DateTime.parse(birthDate)) : "Nespecificată"}"
+              ),
+
               const SizedBox(height: 10),
               attendance['total'] > 0
                   ? Text("Total evenimente: ${attendance['total']}\nPrezențe: ${attendance['present']}\nRată de prezență: ${attendance['percentage'].toStringAsFixed(1)}%")
@@ -361,7 +364,7 @@ class _TeamScreenState extends State<TeamScreen> {
                         ),
                       ),
                       subtitle: member['birthDate'] != null && member['birthDate'] != ""
-                          ? Text("Data nașterii: ${member['birthDate']}")
+                          ? Text("Data nașterii: ${DateFormat("d MMMM yyyy", "ro_RO").format(DateTime.parse(member['birthDate']))}")
                           : null,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
