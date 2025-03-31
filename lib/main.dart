@@ -7,7 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 void enableOfflinePersistence() {
-  FirebaseFirestore.instance.settings = const Settings (
+  FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
   );
 }
@@ -31,7 +31,7 @@ class _MyAppState extends State<MyApp> {
   final List<Widget> _pages = const [
     TeamScreen(),
     AttendanceScreen(),
-    AttendanceHistoryScreen()
+    AttendanceHistoryScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -45,9 +45,6 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       title: 'Prezență Echipa Dans',
       home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Prezență Echipa Dans'),
-        ),
         body: _pages[_selectedIndex],
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,

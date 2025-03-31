@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,19 +15,11 @@ class AttendanceScreen extends StatefulWidget {
 class _AttendanceScreenState extends State<AttendanceScreen> {
   DateTime _selectedDate = DateTime.now();
   final FirebaseService _firebaseService = FirebaseService();
-
-  // Lista de membri încărcată din colecția "members"
   List<Map<String, dynamic>> _members = [];
-  // Variabila locală pentru prezență (modificările efectuate de utilizator)
   Map<String, bool> _localAttendance = {};
-
-  // Controlul modului de editare
   bool _isEditing = true;
-  // Flag care reține dacă utilizatorul a solicitat editare chiar dacă prezența e salvată
   bool _userRequestedEdit = false;
   int _presentCount = 0;
-
-  // Conectivitate: status și abonament
   String _connectionStatus = "Unknown";
   late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
 
@@ -61,7 +52,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     });
   }
 
-  // Funcție care formatează un DateTime în formatul "15 martie 2024"
+  // Formatează data într-un format plăcut, de ex. "15 Martie 2024"
   String _formatDateFromDateTime(DateTime dt) {
     return DateFormat("d MMMM y", "ro_RO").format(dt);
   }
@@ -86,7 +77,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Future<void> _saveAttendance() async {
     String formattedDateDisplay = _formatDateFromDateTime(_selectedDate);
-    // Cheia folosită în Firestore rămâne în format "yyyy-MM-dd"
     String formattedDateKey = DateFormat("yyyy-MM-dd").format(_selectedDate);
     await _firebaseService.saveAttendance(formattedDateKey, _localAttendance);
     setState(() {
@@ -102,8 +92,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     String prettyDate = _formatDateFromDateTime(_selectedDate);
-
-    // Indicatorul de conectivitate: verde când online, roșu când offline
     Color connectivityColor = _connectionStatus == "Online" ? Colors.green[200]! : Colors.red[200]!;
     Widget connectivityIndicator = Container(
       width: double.infinity,
@@ -112,23 +100,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       child: Text(
         "Connection Status: $_connectionStatus",
         textAlign: TextAlign.center,
-        style: const TextStyle(fontWeight: FontWeight.bold),
+        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
       ),
     );
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Prezență"),
+        title: const Text(
+          "Prezență",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.green,
+        elevation: 4,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+        ),
         actions: [
           IconButton(
-            icon: Icon(_isEditing ? Icons.check : Icons.edit),
+            icon: Icon(_isEditing ? Icons.check : Icons.edit, color: Colors.white),
             onPressed: () async {
               String formattedDateKey = DateFormat("yyyy-MM-dd").format(_selectedDate);
               if (_isEditing) {
-                // Salvează modificările dacă suntem în modul edit
                 await _saveAttendance();
               } else {
-                // Dacă nu suntem în modul edit, reîncarcă datele din Firestore și activează editarea
                 Map<String, bool> currentData = await _firebaseService.getAttendanceStream(formattedDateKey).first;
                 setState(() {
                   _localAttendance = Map<String, bool>.from(currentData);
@@ -147,7 +142,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             connectivityIndicator,
             Row(
               children: [
-                Text("Data: $prettyDate"),
+                Text("Data: $prettyDate", style: const TextStyle(fontSize: 16)),
                 IconButton(
                   icon: const Icon(Icons.calendar_today),
                   onPressed: () => _selectDate(context),
@@ -165,7 +160,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     return Center(child: Text("Error: ${snapshot.error}"));
                   }
                   final attendanceData = snapshot.data ?? {};
-
                   if (_localAttendance.isEmpty) {
                     _localAttendance = Map<String, bool>.from(attendanceData);
                   }
@@ -180,10 +174,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       });
                     }
                   }
-
                   _presentCount = _localAttendance.values.where((present) => present).length;
-
-                  // Combină lista de membri încărcată din Firebase cu cei care apar în _localAttendance dar nu se găsesc în _members
                   List<Map<String, dynamic>> unionMembers = List.from(_members);
                   for (var memberId in _localAttendance.keys) {
                     bool exists = unionMembers.any((member) => member['id'] == memberId);
@@ -191,13 +182,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       unionMembers.add({'id': memberId, 'name': 'Membru șters'});
                     }
                   }
-
                   return Column(
                     children: [
                       if (!_isEditing)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Text("Total membri prezenți: $_presentCount"),
+                          child: Text("Total membri prezenți: $_presentCount", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         ),
                       Expanded(
                         child: ListView.builder(
@@ -205,16 +195,24 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           itemBuilder: (context, index) {
                             String memberId = unionMembers[index]['id'];
                             bool isPresent = _localAttendance[memberId] ?? false;
-                            return CheckboxListTile(
-                              title: Text(unionMembers[index]['name']),
-                              value: isPresent,
-                              onChanged: _isEditing
-                                  ? (bool? value) {
-                                setState(() {
-                                  _localAttendance[memberId] = value ?? false;
-                                });
-                              }
-                                  : null,
+                            return Card(
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                              child: CheckboxListTile(
+                                title: Text(unionMembers[index]['name']),
+                                value: isPresent,
+                                activeColor: Colors.green,
+                                onChanged: _isEditing
+                                    ? (bool? value) {
+                                  setState(() {
+                                    _localAttendance[memberId] = value ?? false;
+                                  });
+                                }
+                                    : null,
+                              ),
                             );
                           },
                         ),
@@ -222,7 +220,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       if (_isEditing)
                         ElevatedButton(
                           onPressed: _saveAttendance,
-                          child: const Text("Salvează prezența"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text(
+                            "Salvează prezența",
+                            style: TextStyle(color: Colors.white, fontSize: 16),
+                          ),
                         ),
                     ],
                   );
