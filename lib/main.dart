@@ -5,6 +5,7 @@ import 'history_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 void enableOfflinePersistence() {
   FirebaseFirestore.instance.settings = const Settings(
@@ -15,7 +16,22 @@ void enableOfflinePersistence() {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('ro_RO', null);
-  await Firebase.initializeApp();
+  if (kIsWeb) {
+    // Configurația Firebase pentru web. Înlocuiește valorile cu cele din consola Firebase.
+    await Firebase.initializeApp(
+      options: FirebaseOptions(
+          apiKey: "AIzaSyC4KS1XPSuBGkSGSgdemnNvscmwoJ2TnmA",
+          authDomain: "prezenta-filia.firebaseapp.com",
+          projectId: "prezenta-filia",
+          storageBucket: "prezenta-filia.firebasestorage.app",
+          messagingSenderId: "551860221613",
+          appId: "1:551860221613:web:eac4469de5e190e5a77824",
+          measurementId: "G-B2G7D7JB4H"
+      ),
+    );
+  } else {
+    await Firebase.initializeApp();
+  }
   runApp(const MyApp());
 }
 
