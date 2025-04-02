@@ -6,29 +6,17 @@ import 'firebase_service.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'login_screen.dart';
+import 'global_app_bar.dart';
 
-// Custom Month Picker Dialog
 Future<DateTime?> showMonthPickerDialog(BuildContext context) async {
   final List<String> monthNames = [
-    "Ianuarie",
-    "Februarie",
-    "Martie",
-    "Aprilie",
-    "Mai",
-    "Iunie",
-    "Iulie",
-    "August",
-    "Septembrie",
-    "Octombrie",
-    "Noiembrie",
-    "Decembrie"
+    "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
+    "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
   ];
-  // Valorile inițiale pentru lună și an:
-  int selectedMonth = DateTime.now().month; // 1-12
+  int selectedMonth = DateTime.now().month;
   int selectedYear = DateTime.now().year;
-  // Lista de ani (de exemplu, ultimii 20 de ani)
   List<int> years = List.generate(20, (index) => DateTime.now().year - index);
-
   return showDialog<DateTime>(
     context: context,
     builder: (BuildContext context) {
@@ -92,16 +80,12 @@ Future<DateTime?> showMonthPickerDialog(BuildContext context) async {
   );
 }
 
-// Funcție de generare PDF pentru raportul lunar
 Future<Uint8List> generateMonthlyAttendancePdf(String yearMonth) async {
-  // Obține toate documentele din colecția 'attendance' pentru luna respectivă.
   QuerySnapshot snapshot = await FirebaseFirestore.instance
       .collection('attendance')
       .where('date', isGreaterThanOrEqualTo: "$yearMonth-01")
       .where('date', isLessThan: "$yearMonth-32")
       .get();
-
-  // Grupăm documentele după data evenimentului.
   Map<String, List<DocumentSnapshot>> events = {};
   for (var doc in snapshot.docs) {
     String date = doc['date'];
@@ -111,53 +95,40 @@ Future<Uint8List> generateMonthlyAttendancePdf(String yearMonth) async {
       events[date] = [doc];
     }
   }
-
-  // Obține lista membrilor pentru a mapa memberId la nume.
-  QuerySnapshot membersSnapshot =
-  await FirebaseFirestore.instance.collection('members').get();
+  QuerySnapshot membersSnapshot = await FirebaseFirestore.instance.collection('members').get();
   Map<String, String> membersMap = {};
   for (var doc in membersSnapshot.docs) {
     membersMap[doc.id] = doc['name'];
   }
-
   final pdf = pw.Document();
   pdf.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       build: (context) {
         List<pw.Widget> widgets = [];
-        // Convertim yearMonth într-un DateTime pentru afișarea lunii cu nume
         DateTime dateForDisplay = DateTime.parse("$yearMonth-01");
         String displayMonth = DateFormat("MMMM yyyy", "ro_RO").format(dateForDisplay);
         widgets.add(
           pw.Text(
-            "Raport de prezenta pentru $displayMonth",
-            style: pw.TextStyle(
-              fontSize: 24,
-              fontWeight: pw.FontWeight.bold,
-            ),
+            "Raport de prezență pentru $displayMonth",
+            style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
           ),
         );
         widgets.add(pw.SizedBox(height: 20));
-
-        // Pentru fiecare eveniment din lună, adaugă un titlu și un tabel cu membrii prezenți
         events.forEach((date, docs) {
-          // Filtrăm documentele pentru care 'present' este true
-          List<DocumentSnapshot> presentDocs =
-          docs.where((doc) => doc['present'] == true).toList();
-
-          if (presentDocs.isEmpty) return; // Sărim peste evenimente fără prezență
-
+          List<DocumentSnapshot> presentDocs = docs.where((doc) => doc['present'] == true).toList();
+          if (presentDocs.isEmpty) return;
           List<List<String>> tableData = [];
-          tableData.add(["Membru"]); // Headerul tabelului
+          tableData.add(["Membru"]);
           for (var doc in presentDocs) {
             String memberId = doc['member_id'].toString();
             String name = membersMap[memberId] ?? memberId;
             tableData.add([name]);
           }
+          String formattedDate = DateFormat("d MMMM y", "ro_RO").format(DateTime.parse(date));
           widgets.add(
             pw.Text(
-              "Data: ${DateFormat("d MMMM y", "ro_RO").format(DateTime.parse(date))}",
+              "Data: $formattedDate",
               style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
             ),
           );
@@ -179,14 +150,11 @@ Future<Uint8List> generateMonthlyAttendancePdf(String yearMonth) async {
   return pdf.save();
 }
 
-// Pagina de prezență (AttendanceScreen)
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({Key? key}) : super(key: key);
-
   @override
   _AttendanceScreenState createState() => _AttendanceScreenState();
 }
-
 class _AttendanceScreenState extends State<AttendanceScreen> {
   DateTime _selectedDate = DateTime.now();
   final FirebaseService _firebaseService = FirebaseService();
@@ -196,12 +164,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   bool _userRequestedEdit = false;
   int _presentCount = 0;
 
+  // ScrollController pentru a păstra poziția de scroll
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
     _loadMembers();
   }
-
   Future<void> _loadMembers() async {
     QuerySnapshot membersSnapshot = await _firebaseService.members.get();
     setState(() {
@@ -213,7 +183,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       }).toList();
     });
   }
-
   Future<void> _saveAttendance() async {
     String formattedDateKey = DateFormat("yyyy-MM-dd").format(_selectedDate);
     await _firebaseService.saveAttendance(formattedDateKey, _localAttendance);
@@ -221,12 +190,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       _isEditing = false;
       _userRequestedEdit = false;
       _presentCount = _localAttendance.values.where((present) => present).length;
+      _localAttendance = {}; // Reset după salvare
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text("Prezență salvată pentru ${DateFormat("d MMMM y", "ro_RO").format(_selectedDate)}")),
     );
   }
-
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -240,12 +209,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         _isEditing = true;
         _userRequestedEdit = false;
         _presentCount = 0;
-        _localAttendance.clear();
+        // Nu resetăm _localAttendance aici pentru a păstra modificările curente
       });
     }
   }
-
-  // Funcția de descărcare PDF pentru raportul lunar folosind custom month picker
   Future<void> _downloadMonthlyPdf() async {
     DateTime? pickedMonth = await showMonthPickerDialog(context);
     if (pickedMonth != null) {
@@ -254,40 +221,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       await Printing.sharePdf(bytes: pdfData, filename: "raport_prezență_$yearMonth.pdf");
     }
   }
-
+  // Funcție de refresh pentru AttendanceScreen
+  void _refreshAttendance() {
+    setState(() {
+      // Resetăm _localAttendance pentru a reîncărca datele din stream
+      _localAttendance = {};
+    });
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          "Prezență",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.green,
-        elevation: 4,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(_isEditing ? Icons.check : Icons.edit, color: Colors.white),
-            onPressed: () async {
-              String formattedDateKey = DateFormat("yyyy-MM-dd").format(_selectedDate);
-              if (_isEditing) {
-                await _saveAttendance();
-              } else {
-                Map<String, bool> currentData = await _firebaseService.getAttendanceStream(formattedDateKey).first;
-                setState(() {
-                  _localAttendance = Map<String, bool>.from(currentData);
-                  _isEditing = true;
-                  _userRequestedEdit = true;
-                });
-              }
-            },
-          ),
-        ],
-      ),
+      appBar: GlobalAppBar(title: "Prezență", onRefresh: _refreshAttendance),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -313,24 +257,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     return Center(child: Text("Error: ${snapshot.error}"));
                   }
                   final attendanceData = snapshot.data ?? {};
-                  if (_localAttendance.isEmpty) {
+                  if (_localAttendance.isEmpty && attendanceData.isNotEmpty) {
                     _localAttendance = Map<String, bool>.from(attendanceData);
-                  }
-                  if (attendanceData.isNotEmpty && !_userRequestedEdit) {
-                    if (_isEditing) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) {
-                          setState(() {
-                            _isEditing = false;
-                          });
-                        }
-                      });
-                    }
                   }
                   _presentCount = _localAttendance.values.where((present) => present).length;
                   return Column(
                     children: [
-                      if (!_isEditing)
+                      if (currentUserRole == UserRole.admin && !_isEditing)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8.0),
                           child: Text("Total membri prezenți: $_presentCount",
@@ -338,6 +271,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         ),
                       Expanded(
                         child: ListView.builder(
+                          key: const PageStorageKey("attendance_list"),
+                          controller: _scrollController,
                           itemCount: _members.length,
                           itemBuilder: (context, index) {
                             String memberId = _members[index]['id'];
@@ -345,8 +280,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             return CheckboxListTile(
                               title: Text(_members[index]['name']),
                               value: isPresent,
-                              activeColor: Colors.green,
-                              onChanged: _isEditing
+                              activeColor: Colors.deepPurple,
+                              onChanged: currentUserRole == UserRole.admin
                                   ? (bool? value) {
                                 setState(() {
                                   _localAttendance[memberId] = value ?? false;
@@ -357,20 +292,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           },
                         ),
                       ),
-                      if (_isEditing)
+                      if (currentUserRole == UserRole.admin && _isEditing)
                         ElevatedButton(
                           onPressed: _saveAttendance,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
+                            backgroundColor: Colors.deepPurple,
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          child: const Text(
-                            "Salvează prezența",
-                            style: TextStyle(color: Colors.white, fontSize: 16),
-                          ),
+                          child: const Text("Salvează prezența", style: TextStyle(color: Colors.white, fontSize: 16)),
                         ),
                     ],
                   );
@@ -381,7 +313,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.green,
+        backgroundColor: Colors.deepPurple,
         child: const Icon(Icons.picture_as_pdf, color: Colors.white),
         onPressed: _downloadMonthlyPdf,
       ),

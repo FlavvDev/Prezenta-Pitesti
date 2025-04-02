@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'login_screen.dart';
 import 'team_screen.dart';
 import 'prezenta_screen.dart';
 import 'history_screen.dart';
@@ -17,31 +18,31 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('ro_RO', null);
   if (kIsWeb) {
-    // Configurația Firebase pentru web. Înlocuiește valorile cu cele din consola Firebase.
     await Firebase.initializeApp(
       options: FirebaseOptions(
-          apiKey: "AIzaSyC4KS1XPSuBGkSGSgdemnNvscmwoJ2TnmA",
-          authDomain: "prezenta-filia.firebaseapp.com",
-          projectId: "prezenta-filia",
-          storageBucket: "prezenta-filia.firebasestorage.app",
-          messagingSenderId: "551860221613",
-          appId: "1:551860221613:web:eac4469de5e190e5a77824",
-          measurementId: "G-B2G7D7JB4H"
+        apiKey: "AIzaSyC4KS1XPSuBGkSGSgdemnNvscmwoJ2TnmA",
+        authDomain: "prezenta-filia.firebaseapp.com",
+        projectId: "prezenta-filia",
+        storageBucket: "prezenta-filia.firebasestorage.app",
+        messagingSenderId: "551860221613",
+        appId: "1:551860221613:web:eac4469de5e190e5a77824",
+        measurementId: "G-B2G7D7JB4H",
       ),
     );
   } else {
     await Firebase.initializeApp();
   }
-  runApp(const MyApp());
+  runApp(const MaterialApp(
+    title: 'Prezență Echipă Dans',
+    home: LoginScreen(),
+  ));
 }
 
 class MyApp extends StatefulWidget {
   const MyApp({Key? key}) : super(key: key);
-
   @override
   _MyAppState createState() => _MyAppState();
 }
-
 class _MyAppState extends State<MyApp> {
   int _selectedIndex = 0;
   final List<Widget> _pages = const [
@@ -49,13 +50,11 @@ class _MyAppState extends State<MyApp> {
     AttendanceScreen(),
     AttendanceHistoryScreen(),
   ];
-
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
   }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -67,7 +66,7 @@ class _MyAppState extends State<MyApp> {
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.people),
-              label: "Echipa",
+              label: "Echipă",
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.check),

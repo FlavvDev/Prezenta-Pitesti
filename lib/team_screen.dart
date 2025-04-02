@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_service.dart';
 import 'package:intl/intl.dart';
+import 'login_screen.dart';
+import 'global_app_bar.dart';
 
 class TeamScreen extends StatefulWidget {
   const TeamScreen({Key? key}) : super(key: key);
-
   @override
   _TeamScreenState createState() => _TeamScreenState();
 }
-
 class _TeamScreenState extends State<TeamScreen> {
   final FirebaseService _firebaseService = FirebaseService();
   List<Map<String, dynamic>> _members = [];
@@ -21,7 +21,6 @@ class _TeamScreenState extends State<TeamScreen> {
     _loadMembers();
   }
 
-  // Încarcă membrii din Firestore, inclusiv data nașterii (opțional)
   Future<void> _loadMembers() async {
     QuerySnapshot snapshot = await _firebaseService.members.get();
     setState(() {
@@ -36,11 +35,10 @@ class _TeamScreenState extends State<TeamScreen> {
     });
   }
 
-  // Adaugă un membru nou; birthDate poate fi "" dacă nu este specificată.
   Future<void> _addMember(String name, String birthDate) async {
     if (name.isEmpty) return;
     try {
-      await _firebaseService.addMember(name, birthDate); // asigură-te că metoda din firebase_service.dart este actualizată
+      await _firebaseService.addMember(name, birthDate);
       _loadMembers();
     } catch (e) {
       ScaffoldMessenger.of(context)
@@ -48,13 +46,11 @@ class _TeamScreenState extends State<TeamScreen> {
     }
   }
 
-  // Actualizează datele unui membru
   Future<void> _updateMember(String memberId, String name, String birthDate) async {
-    await _firebaseService.updateMember(memberId, name, birthDate); // asigură-te că updateMember este implementat
+    await _firebaseService.updateMember(memberId, name, birthDate);
     _loadMembers();
   }
 
-  // Popup pentru adăugarea unui nou membru (nume + data nașterii opțional)
   Future<void> _showAddMemberDialog() async {
     TextEditingController nameController = TextEditingController();
     TextEditingController birthController = TextEditingController();
@@ -87,7 +83,6 @@ class _TeamScreenState extends State<TeamScreen> {
                     lastDate: DateTime.now(),
                   );
                   if (pickedDate != null) {
-                    // Formatează data; poți schimba formatul după preferință
                     birthController.text = DateFormat("yyyy-MM-dd").format(pickedDate);
                   }
                 },
@@ -112,9 +107,6 @@ class _TeamScreenState extends State<TeamScreen> {
     );
   }
 
-  // Popup care afișează detaliile unui membru:
-  // nume, data nașterii (dacă există) și informații despre prezență,
-  // plus un buton de Edit pentru a modifica numele și data nașterii.
   void _showMemberDetailsPopup(String memberId, String memberName, String birthDate) async {
     final attendance = await _calculateAttendance(memberId);
     showDialog(
@@ -127,10 +119,7 @@ class _TeamScreenState extends State<TeamScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text("Nume: $memberName"),
-              Text(
-                  "Data nașterii: ${birthDate.isNotEmpty ? DateFormat("d MMMM yyyy", "ro_RO").format(DateTime.parse(birthDate)) : "Nespecificată"}"
-              ),
-
+              Text("Data nașterii: ${birthDate.isNotEmpty ? DateFormat("d MMMM yyyy", "ro_RO").format(DateTime.parse(birthDate)) : "Nespecificată"}"),
               const SizedBox(height: 10),
               attendance['total'] > 0
                   ? Text("Total evenimente: ${attendance['total']}\nPrezențe: ${attendance['present']}\nRată de prezență: ${attendance['percentage'].toStringAsFixed(1)}%")
@@ -142,20 +131,20 @@ class _TeamScreenState extends State<TeamScreen> {
               onPressed: () => Navigator.of(context).pop(),
               child: const Text("Închide"),
             ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _showEditMemberDialog(memberId, memberName, birthDate);
-              },
-              child: const Text("Edit"),
-            ),
+            if (currentUserRole == UserRole.admin || currentUserRole == UserRole.member)
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _showEditMemberDialog(memberId, memberName, birthDate);
+                },
+                child: const Text("Edit"),
+              ),
           ],
         );
       },
     );
   }
 
-  // Popup pentru editarea detaliilor membrului (nume și data nașterii)
   void _showEditMemberDialog(String memberId, String currentName, String currentBirth) async {
     TextEditingController nameController = TextEditingController(text: currentName);
     TextEditingController birthController = TextEditingController(text: currentBirth);
@@ -212,7 +201,6 @@ class _TeamScreenState extends State<TeamScreen> {
     );
   }
 
-  // Șterge un membru (cu confirmare)
   void _confirmDelete(String memberId) {
     showDialog(
       context: context,
@@ -243,7 +231,6 @@ class _TeamScreenState extends State<TeamScreen> {
     _loadMembers();
   }
 
-  // Calculează prezența pentru un membru (la fel ca înainte)
   Future<Map<String, dynamic>> _calculateAttendance(String memberId) async {
     QuerySnapshot validSnapshot = await FirebaseFirestore.instance
         .collection('attendance')
@@ -280,52 +267,36 @@ class _TeamScreenState extends State<TeamScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Filtrarea membrilor în funcție de _searchQuery
     List<Map<String, dynamic>> filteredMembers = _searchQuery.isEmpty
         ? _members
         : _members.where((member) {
       String name = member['name'].toLowerCase();
       return name.contains(_searchQuery.toLowerCase());
     }).toList();
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          "Echipa",
-          style: TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.deepPurple,
-        elevation: 4,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
-        ),
-      ),
+      appBar: GlobalAppBar(title: "Echipă", onRefresh: () {
+        _loadMembers();
+      }),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Butonul de Adaugă membru (fără input direct pe ecran)
-            ElevatedButton(
-              onPressed: _showAddMemberDialog,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+            if (currentUserRole == UserRole.admin || currentUserRole == UserRole.member)
+              ElevatedButton(
+                onPressed: _showAddMemberDialog,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                child: const Text(
+                  "Adaugă membru",
+                  style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
               ),
-              child: const Text(
-                "Adaugă membru",
-                style: TextStyle(color: Colors.white, fontSize: 16),
-              ),
-            ),
             const SizedBox(height: 20),
-            // Bara de căutare pentru filtrarea membrilor după nume
             TextField(
               decoration: InputDecoration(
                 labelText: "Caută după nume",
@@ -341,11 +312,11 @@ class _TeamScreenState extends State<TeamScreen> {
               },
             ),
             const SizedBox(height: 20),
-            // Lista de membri filtrată
             Expanded(
               child: filteredMembers.isEmpty
                   ? const Center(child: Text("Nu există membri în listă."))
                   : ListView.builder(
+                key: const PageStorageKey("team_list"),
                 itemCount: filteredMembers.length,
                 itemBuilder: (context, index) {
                   final member = filteredMembers[index];
@@ -364,7 +335,7 @@ class _TeamScreenState extends State<TeamScreen> {
                         ),
                       ),
                       subtitle: member['birthDate'] != null && member['birthDate'] != ""
-                          ? Text("Data nașterii: ${DateFormat("d MMMM yyyy", "ro_RO").format(DateTime.parse(member['birthDate']))}")
+                          ? Text("${DateFormat("d MMMM yyyy", "ro_RO").format(DateTime.parse(member['birthDate']))}")
                           : null,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -375,17 +346,12 @@ class _TeamScreenState extends State<TeamScreen> {
                               if (snapshot.connectionState == ConnectionState.waiting) {
                                 return const SizedBox(
                                   width: 40,
-                                  child: Center(
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2)),
+                                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
                                 );
                               } else if (snapshot.hasError) {
                                 return const Text(
                                   "0%",
-                                  style: TextStyle(
-                                      fontSize: 20,
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.bold),
+                                  style: TextStyle(fontSize: 20, color: Colors.red, fontWeight: FontWeight.bold),
                                 );
                               }
                               final attendance = snapshot.data!;
@@ -393,24 +359,25 @@ class _TeamScreenState extends State<TeamScreen> {
                               Color percentageColor = percentage >= 50 ? Colors.green : Colors.red;
                               return Text(
                                 "${percentage.toStringAsFixed(1)}%",
-                                style: TextStyle(
-                                    fontSize: 20,
-                                    color: percentageColor,
-                                    fontWeight: FontWeight.bold),
+                                style: TextStyle(fontSize: 20, color: percentageColor, fontWeight: FontWeight.bold),
                               );
                             },
                           ),
                           const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => _confirmDelete(member['id']),
-                          ),
+                          if (currentUserRole == UserRole.admin || currentUserRole == UserRole.member)
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.deepPurple),
+                              onPressed: () => _showEditMemberDialog(member['id'], member['name'], member['birthDate'] ?? ""),
+                            ),
+                          const SizedBox(width: 8),
+                          if (currentUserRole == UserRole.admin)
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _confirmDelete(member['id']),
+                            ),
                         ],
                       ),
-                      onTap: () => _showMemberDetailsPopup(
-                          member['id'],
-                          member['name'],
-                          member['birthDate'] ?? ""),
+                      onTap: () => _showMemberDetailsPopup(member['id'], member['name'], member['birthDate'] ?? ""),
                     ),
                   );
                 },
