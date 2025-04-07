@@ -114,7 +114,8 @@ class TeamScreenState extends State<TeamScreen> {
                     lastDate: DateTime.now(),
                   );
                   if (pickedDate != null) {
-                    birthController.text = DateFormat("yyyy-MM-dd").format(pickedDate);
+                    birthController.text =
+                        DateFormat("yyyy-MM-dd").format(pickedDate);
                   }
                 },
               ),
@@ -138,6 +139,42 @@ class TeamScreenState extends State<TeamScreen> {
     );
   }
 
+  // Metodă care calculează istoricul de prezență pentru un membru
+  Future<Map<String, dynamic>> _calculateAttendance(String memberId) async {
+    QuerySnapshot validSnapshot = await FirebaseFirestore.instance
+        .collection('attendance')
+        .where('present', isEqualTo: true)
+        .get();
+    Set<String> validDates = {};
+    for (var doc in validSnapshot.docs) {
+      validDates.add(doc['date']);
+    }
+    QuerySnapshot memberSnapshot = await FirebaseFirestore.instance
+        .collection('attendance')
+        .where('member_id', isEqualTo: memberId)
+        .get();
+    Map<String, bool> memberAttendanceMap = {};
+    for (var doc in memberSnapshot.docs) {
+      String date = doc['date'];
+      bool present = doc['present'] == true;
+      memberAttendanceMap[date] = present;
+    }
+    int totalEvents = validDates.length;
+    int presentCount = 0;
+    for (var date in validDates) {
+      if (memberAttendanceMap[date] == true) {
+        presentCount++;
+      }
+    }
+    double percentage = totalEvents > 0 ? (presentCount / totalEvents) * 100 : 0;
+    return {
+      'total': totalEvents,
+      'present': presentCount,
+      'percentage': percentage,
+    };
+  }
+
+  // Afișează popup-ul de detalii pentru un membru, inclusiv un buton "Istoric"
   void _showMemberDetailsPopup(String memberId, String memberName, String birthDate) async {
     final attendance = await _calculateAttendance(memberId);
     showDialog(
@@ -150,10 +187,12 @@ class TeamScreenState extends State<TeamScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text("Nume: $memberName"),
-              Text("Data nașterii: ${birthDate.isNotEmpty ? DateFormat("d MMMM yyyy", "ro_RO").format(DateTime.parse(birthDate)) : "Nespecificată"}"),
+              Text(
+                  "Data nașterii: ${birthDate.isNotEmpty ? DateFormat("d MMMM yyyy", "ro_RO").format(DateTime.parse(birthDate)) : "Nespecificată"}"),
               const SizedBox(height: 10),
               attendance['total'] > 0
-                  ? Text("Total evenimente: ${attendance['total']}\nPrezențe: ${attendance['present']}\nRată de prezență: ${attendance['percentage'].toStringAsFixed(1)}%")
+                  ? Text(
+                  "Total evenimente: ${attendance['total']}\nPrezențe: ${attendance['present']}\nRată de prezență: ${attendance['percentage'].toStringAsFixed(1)}%")
                   : const Text("Nu există înregistrări de prezență."),
             ],
           ),
@@ -161,6 +200,14 @@ class TeamScreenState extends State<TeamScreen> {
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text("Închide"),
+            ),
+            // Butonul Istoric pentru a afișa lista de prezențe
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _showAttendanceHistoryPopup(memberId, memberName);
+              },
+              child: const Text("Istoric"),
             ),
             if (currentUserRole == UserRole.admin || currentUserRole == UserRole.member)
               TextButton(
@@ -170,6 +217,57 @@ class TeamScreenState extends State<TeamScreen> {
                 },
                 child: const Text("Edit"),
               ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Afișează popup-ul pentru istoria prezențelor unui membru
+  void _showAttendanceHistoryPopup(String memberId, String memberName) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Istoric prezențe pentru $memberName"),
+          content: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _getMemberAttendanceHistory(memberId),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                    height: 100, child: Center(child: CircularProgressIndicator()));
+              } else if (snapshot.hasError) {
+                return Text("Eroare: ${snapshot.error}");
+              }
+              final history = snapshot.data ?? [];
+              if (history.isEmpty) {
+                return const Text("Nu există prezențe înregistrate.");
+              }
+              return SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: history.length,
+                  itemBuilder: (context, index) {
+                    final item = history[index];
+                    DateTime date = DateTime.parse(item['date']);
+                    String formattedDate =
+                    DateFormat("d MMMM y", "ro_RO").format(date);
+                    bool present = item['present'];
+                    return ListTile(
+                      title: Text(formattedDate),
+                      subtitle: Text(present ? "Prezent" : "Absent"),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("Închide"),
+            ),
           ],
         );
       },
@@ -208,7 +306,8 @@ class TeamScreenState extends State<TeamScreen> {
                     lastDate: DateTime.now(),
                   );
                   if (pickedDate != null) {
-                    birthController.text = DateFormat("yyyy-MM-dd").format(pickedDate);
+                    birthController.text =
+                        DateFormat("yyyy-MM-dd").format(pickedDate);
                   }
                 },
               ),
@@ -262,38 +361,19 @@ class TeamScreenState extends State<TeamScreen> {
     _loadMembers();
   }
 
-  Future<Map<String, dynamic>> _calculateAttendance(String memberId) async {
-    QuerySnapshot validSnapshot = await FirebaseFirestore.instance
-        .collection('attendance')
-        .where('present', isEqualTo: true)
-        .get();
-    Set<String> validDates = {};
-    for (var doc in validSnapshot.docs) {
-      validDates.add(doc['date']);
-    }
-    QuerySnapshot memberSnapshot = await FirebaseFirestore.instance
+  // Metoda care preia istoricul de prezențe pentru un membru
+  Future<List<Map<String, dynamic>>> _getMemberAttendanceHistory(String memberId) async {
+    QuerySnapshot snapshot = await FirebaseFirestore.instance
         .collection('attendance')
         .where('member_id', isEqualTo: memberId)
+        .orderBy('date', descending: true)
         .get();
-    Map<String, bool> memberAttendanceMap = {};
-    for (var doc in memberSnapshot.docs) {
-      String date = doc['date'];
-      bool present = doc['present'] == true;
-      memberAttendanceMap[date] = present;
-    }
-    int totalEvents = validDates.length;
-    int presentCount = 0;
-    for (var date in validDates) {
-      if (memberAttendanceMap[date] == true) {
-        presentCount++;
-      }
-    }
-    double percentage = totalEvents > 0 ? (presentCount / totalEvents) * 100 : 0;
-    return {
-      'total': totalEvents,
-      'present': presentCount,
-      'percentage': percentage,
-    };
+    return snapshot.docs.map((doc) {
+      return {
+        'date': doc['date'],
+        'present': doc['present'] == true,
+      };
+    }).toList();
   }
 
   @override
@@ -308,8 +388,10 @@ class TeamScreenState extends State<TeamScreen> {
 
     // Aplicăm sortarea
     if (_sortOption == SortOption.name) {
-      filteredMembers.sort((a, b) =>
-          a['name'].toString().toLowerCase().compareTo(b['name'].toString().toLowerCase()));
+      filteredMembers.sort((a, b) => a['name']
+          .toString()
+          .toLowerCase()
+          .compareTo(b['name'].toString().toLowerCase()));
     } else if (_sortOption == SortOption.attendance) {
       filteredMembers.sort((a, b) {
         double aPerc = _attendancePercentages[a['id']] ?? 0;
@@ -333,7 +415,8 @@ class TeamScreenState extends State<TeamScreen> {
                 onPressed: _showAddMemberDialog,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.deepPurple,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -353,7 +436,8 @@ class TeamScreenState extends State<TeamScreen> {
                     _sortOption = newOption;
                   });
                 },
-                itemBuilder: (BuildContext context) => <PopupMenuEntry<SortOption>>[
+                itemBuilder: (BuildContext context) =>
+                <PopupMenuEntry<SortOption>>[
                   const PopupMenuItem<SortOption>(
                     value: SortOption.name,
                     child: Text("Nume"),
@@ -366,7 +450,10 @@ class TeamScreenState extends State<TeamScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: const [
-                    Text("Sortare", style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold)),
+                    Text("Sortare",
+                        style: TextStyle(
+                            color: Colors.deepPurple,
+                            fontWeight: FontWeight.bold)),
                     Icon(Icons.arrow_drop_down, color: Colors.deepPurple),
                   ],
                 ),
@@ -410,8 +497,10 @@ class TeamScreenState extends State<TeamScreen> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      subtitle: member['birthDate'] != null && member['birthDate'] != ""
-                          ? Text("Data nașterii: ${DateFormat("d MMMM yyyy", "ro_RO").format(DateTime.parse(member['birthDate']))}")
+                      subtitle: member['birthDate'] != null &&
+                          member['birthDate'] != ""
+                          ? Text(
+                          "Data nașterii: ${DateFormat("d MMMM yyyy", "ro_RO").format(DateTime.parse(member['birthDate']))}")
                           : null,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -419,41 +508,61 @@ class TeamScreenState extends State<TeamScreen> {
                           FutureBuilder<Map<String, dynamic>>(
                             future: _calculateAttendance(member['id']),
                             builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
                                 return const SizedBox(
                                   width: 40,
-                                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                  child: Center(
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2)),
                                 );
                               } else if (snapshot.hasError) {
                                 return const Text(
                                   "0%",
-                                  style: TextStyle(fontSize: 20, color: Colors.red, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.bold),
                                 );
                               }
                               final attendance = snapshot.data!;
-                              double percentage = attendance['percentage'] as double;
-                              Color percentageColor = percentage >= 50 ? Colors.green : Colors.red;
+                              double percentage =
+                              attendance['percentage'] as double;
+                              Color percentageColor =
+                              percentage >= 50 ? Colors.green : Colors.red;
                               return Text(
                                 "${percentage.toStringAsFixed(1)}%",
-                                style: TextStyle(fontSize: 20, color: percentageColor, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                    fontSize: 20,
+                                    color: percentageColor,
+                                    fontWeight: FontWeight.bold),
                               );
                             },
                           ),
                           const SizedBox(width: 8),
-                          if (currentUserRole == UserRole.admin || currentUserRole == UserRole.member)
+                          if (currentUserRole == UserRole.admin ||
+                              currentUserRole == UserRole.member)
                             IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.deepPurple),
-                              onPressed: () => _showEditMemberDialog(member['id'], member['name'], member['birthDate'] ?? ""),
+                              icon:
+                              const Icon(Icons.edit, color: Colors.deepPurple),
+                              onPressed: () => _showEditMemberDialog(
+                                  member['id'],
+                                  member['name'],
+                                  member['birthDate'] ?? ""),
                             ),
                           const SizedBox(width: 8),
                           if (currentUserRole == UserRole.admin)
                             IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
+                              icon:
+                              const Icon(Icons.delete, color: Colors.red),
                               onPressed: () => _confirmDelete(member['id']),
                             ),
                         ],
                       ),
-                      onTap: () => _showMemberDetailsPopup(member['id'], member['name'], member['birthDate'] ?? ""),
+                      onTap: () => _showMemberDetailsPopup(
+                          member['id'],
+                          member['name'],
+                          member['birthDate'] ?? ""),
                     ),
                   );
                 },

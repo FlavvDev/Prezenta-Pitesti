@@ -46,6 +46,7 @@ class FirebaseService {
         'member_id': entry.key,
         'date': date,
         'present': entry.value,
+        'important': false,
       });
     }
   }
