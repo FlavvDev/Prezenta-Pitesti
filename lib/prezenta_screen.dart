@@ -152,10 +152,12 @@ Future<Uint8List> generateMonthlyAttendancePdf(String yearMonth) async {
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({Key? key}) : super(key: key);
+
   @override
-  _AttendanceScreenState createState() => _AttendanceScreenState();
+  AttendanceScreenState createState() => AttendanceScreenState();
 }
-class _AttendanceScreenState extends State<AttendanceScreen> {
+
+class AttendanceScreenState extends State<AttendanceScreen> {
   DateTime _selectedDate = DateTime.now();
   final FirebaseService _firebaseService = FirebaseService();
   List<Map<String, dynamic>> _members = [];
@@ -163,8 +165,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   bool _isEditing = true;
   bool _userRequestedEdit = false;
   int _presentCount = 0;
+  String _searchQuery = "";
 
-  // ScrollController pentru a păstra poziția de scroll
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -172,6 +174,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     super.initState();
     _loadMembers();
   }
+
   Future<void> _loadMembers() async {
     QuerySnapshot membersSnapshot = await _firebaseService.members.get();
     setState(() {
@@ -183,6 +186,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       }).toList();
     });
   }
+
   Future<void> _saveAttendance() async {
     String formattedDateKey = DateFormat("yyyy-MM-dd").format(_selectedDate);
     await _firebaseService.saveAttendance(formattedDateKey, _localAttendance);
@@ -196,6 +200,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       SnackBar(content: Text("Prezență salvată pentru ${DateFormat("d MMMM y", "ro_RO").format(_selectedDate)}")),
     );
   }
+
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -209,10 +214,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         _isEditing = true;
         _userRequestedEdit = false;
         _presentCount = 0;
-        // Nu resetăm _localAttendance aici pentru a păstra modificările curente
+        // Nu resetăm _localAttendance pentru a păstra eventualele modificări curente
       });
     }
   }
+
   Future<void> _downloadMonthlyPdf() async {
     DateTime? pickedMonth = await showMonthPickerDialog(context);
     if (pickedMonth != null) {
@@ -221,17 +227,26 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       await Printing.sharePdf(bytes: pdfData, filename: "raport_prezență_$yearMonth.pdf");
     }
   }
-  // Funcție de refresh pentru AttendanceScreen
-  void _refreshAttendance() {
+
+  // Metodă publică de refresh pentru AttendanceScreen
+  void refresh() {
     setState(() {
-      // Resetăm _localAttendance pentru a reîncărca datele din stream
-      _localAttendance = {};
+      _localAttendance = {}; // Resetează pentru a reîncărca datele din stream
     });
   }
+
   @override
   Widget build(BuildContext context) {
+    // Filtrăm membrii în funcție de _searchQuery
+    List<Map<String, dynamic>> filteredMembers = _searchQuery.isEmpty
+        ? _members
+        : _members.where((member) {
+      String name = member['name'].toLowerCase();
+      return name.contains(_searchQuery.toLowerCase());
+    }).toList();
+
     return Scaffold(
-      appBar: GlobalAppBar(title: "Prezență", onRefresh: _refreshAttendance),
+      appBar: GlobalAppBar(title: "Prezență", onRefresh: refresh),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -246,6 +261,23 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 ),
               ],
             ),
+            // Adăugăm un search bar sub rândul de selecție a datei
+            const SizedBox(height: 10),
+            TextField(
+              decoration: InputDecoration(
+                labelText: "Caută după nume",
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+            ),
+            const SizedBox(height: 10),
             Expanded(
               child: StreamBuilder<Map<String, bool>>(
                 stream: _firebaseService.getAttendanceStream(DateFormat("yyyy-MM-dd").format(_selectedDate)),
@@ -273,12 +305,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         child: ListView.builder(
                           key: const PageStorageKey("attendance_list"),
                           controller: _scrollController,
-                          itemCount: _members.length,
+                          itemCount: filteredMembers.length,
                           itemBuilder: (context, index) {
-                            String memberId = _members[index]['id'];
+                            String memberId = filteredMembers[index]['id'];
                             bool isPresent = _localAttendance[memberId] ?? false;
                             return CheckboxListTile(
-                              title: Text(_members[index]['name']),
+                              title: Text(filteredMembers[index]['name']),
                               value: isPresent,
                               activeColor: Colors.deepPurple,
                               onChanged: currentUserRole == UserRole.admin

@@ -5,15 +5,22 @@ import 'package:intl/intl.dart';
 import 'login_screen.dart';
 import 'global_app_bar.dart';
 
+enum SortOption { name, attendance }
+
 class TeamScreen extends StatefulWidget {
   const TeamScreen({Key? key}) : super(key: key);
+
   @override
-  _TeamScreenState createState() => _TeamScreenState();
+  TeamScreenState createState() => TeamScreenState();
 }
-class _TeamScreenState extends State<TeamScreen> {
+
+class TeamScreenState extends State<TeamScreen> {
   final FirebaseService _firebaseService = FirebaseService();
   List<Map<String, dynamic>> _members = [];
   String _searchQuery = "";
+  SortOption _sortOption = SortOption.name;
+  // Map care stochează procentajul de prezență pentru fiecare membru (cheia este id-ul membrului)
+  Map<String, double> _attendancePercentages = {};
 
   @override
   void initState() {
@@ -33,6 +40,30 @@ class _TeamScreenState extends State<TeamScreen> {
         };
       }).toList();
     });
+    await _computeAttendancePercentages();
+  }
+
+  // Calculăm procentajul de prezență pentru fiecare membru și actualizăm _attendancePercentages
+  Future<void> _computeAttendancePercentages() async {
+    Map<String, double> newPercentages = {};
+    for (var member in _members) {
+      String id = member['id'];
+      try {
+        Map<String, dynamic> attendance = await _calculateAttendance(id);
+        double percentage = attendance['percentage'] as double;
+        newPercentages[id] = percentage;
+      } catch (e) {
+        newPercentages[id] = 0;
+      }
+    }
+    setState(() {
+      _attendancePercentages = newPercentages;
+    });
+  }
+
+  // Metodă de refresh publică
+  void refresh() {
+    _loadMembers();
   }
 
   Future<void> _addMember(String name, String birthDate) async {
@@ -267,20 +298,36 @@ class _TeamScreenState extends State<TeamScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Filtrare după nume
     List<Map<String, dynamic>> filteredMembers = _searchQuery.isEmpty
         ? _members
         : _members.where((member) {
       String name = member['name'].toLowerCase();
       return name.contains(_searchQuery.toLowerCase());
     }).toList();
+
+    // Aplicăm sortarea
+    if (_sortOption == SortOption.name) {
+      filteredMembers.sort((a, b) =>
+          a['name'].toString().toLowerCase().compareTo(b['name'].toString().toLowerCase()));
+    } else if (_sortOption == SortOption.attendance) {
+      filteredMembers.sort((a, b) {
+        double aPerc = _attendancePercentages[a['id']] ?? 0;
+        double bPerc = _attendancePercentages[b['id']] ?? 0;
+        return bPerc.compareTo(aPerc); // cei cu procent mai mare apar primele
+      });
+    }
+
     return Scaffold(
-      appBar: GlobalAppBar(title: "Echipă", onRefresh: () {
-        _loadMembers();
-      }),
+      appBar: GlobalAppBar(
+        title: "Echipă",
+        onRefresh: refresh,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // Butonul de "Adaugă membru"
             if (currentUserRole == UserRole.admin || currentUserRole == UserRole.member)
               ElevatedButton(
                 onPressed: _showAddMemberDialog,
@@ -296,7 +343,36 @@ class _TeamScreenState extends State<TeamScreen> {
                   style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
               ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
+            // Buton de sortare: la apăsare se afișează opțiunile de sortare
+            Align(
+              alignment: Alignment.centerRight,
+              child: PopupMenuButton<SortOption>(
+                onSelected: (SortOption newOption) {
+                  setState(() {
+                    _sortOption = newOption;
+                  });
+                },
+                itemBuilder: (BuildContext context) => <PopupMenuEntry<SortOption>>[
+                  const PopupMenuItem<SortOption>(
+                    value: SortOption.name,
+                    child: Text("Nume"),
+                  ),
+                  const PopupMenuItem<SortOption>(
+                    value: SortOption.attendance,
+                    child: Text("Prezență"),
+                  ),
+                ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Text("Sortare", style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold)),
+                    Icon(Icons.arrow_drop_down, color: Colors.deepPurple),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             TextField(
               decoration: InputDecoration(
                 labelText: "Caută după nume",
@@ -311,7 +387,7 @@ class _TeamScreenState extends State<TeamScreen> {
                 });
               },
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
             Expanded(
               child: filteredMembers.isEmpty
                   ? const Center(child: Text("Nu există membri în listă."))
@@ -335,7 +411,7 @@ class _TeamScreenState extends State<TeamScreen> {
                         ),
                       ),
                       subtitle: member['birthDate'] != null && member['birthDate'] != ""
-                          ? Text("${DateFormat("d MMMM yyyy", "ro_RO").format(DateTime.parse(member['birthDate']))}")
+                          ? Text("Data nașterii: ${DateFormat("d MMMM yyyy", "ro_RO").format(DateTime.parse(member['birthDate']))}")
                           : null,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,

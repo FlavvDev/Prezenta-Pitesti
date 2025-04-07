@@ -43,7 +43,7 @@ Future<Uint8List> generateMonthlyAttendancePdf(String yearMonth) async {
         List<pw.Widget> widgets = [];
         widgets.add(
           pw.Text(
-            "Raport de prezență pentru $formattedMonth",
+            "Raport de prezenta pentru $formattedMonth",
             style: pw.TextStyle(
               fontSize: 24,
               fontWeight: pw.FontWeight.bold,
